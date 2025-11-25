@@ -1,0 +1,49 @@
+{
+  "Server": {
+    "HttpsPort": 5443,
+    "BindAddress": "0.0.0.0",
+    "EnableDiscovery": true,
+    "DiscoveryPort": 5444,
+    "CertificatePath": "",
+    "CertificatePassword": ""
+  },
+  "Monitoring": {
+    "UpdateIntervalMs": 1000,
+    "EnableCpuMonitoring": true,
+    "EnableGpuMonitoring": true,
+    "EnableRamMonitoring": true,
+    "EnableDiskMonitoring": true,
+    "EnableNetworkMonitoring": true,
+    "EnableBatteryMonitoring": true,
+    "EnableFanMonitoring": true,
+    "EnableProcessMonitoring": true,
+    "ProcessUpdateIntervalMs": 2000,
+    "MaxProcessesToTrack": 100
+  },
+  "Security": {
+    "RequireAuthentication": true,
+    "AuthToken": "5pDQz1mlanpk9hg8AyJ7yxZaWooOyncVPBKm9qqSqNo=",
+    "AllowRemoteAccess": false,
+    "AllowedIpAddresses": [],
+    "EnableMutualTls": false,
+    "TokenExpirationMinutes": 1440
+  },
+  "Storage": {
+    "DatabasePath": "syslink_data.db",
+    "RetentionHours": 24,
+    "StorageIntervalSeconds": 10,
+    "EnableCompression": true,
+    "MaxDatabaseSizeMB": 500
+  },
+  "Alerts": {
+    "EnableAlerts": true,
+    "CpuTempThreshold": 85,
+    "GpuTempThreshold": 85,
+    "CpuUsageThreshold": 95,
+    "RamUsageThreshold": 90,
+    "BatteryLowThreshold": 20,
+    "BatteryHighThreshold": 80,
+    "DiskUsageThreshold": 90,
+    "AlertCooldownSeconds": 300
+  }
+}
