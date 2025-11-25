@@ -14,7 +14,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.syslink.monitor.ui.screens.detailed.DetailedScreen
-import com.syslink.monitor.ui.screens.graphs.GraphsScreen
 import com.syslink.monitor.ui.screens.processes.ProcessesScreen
 import com.syslink.monitor.ui.screens.settings.SettingsScreen
 import com.syslink.monitor.ui.screens.simple.SimpleScreen
@@ -26,7 +25,6 @@ sealed class Screen(
 ) {
     data object Simple : Screen("simple", "Simple", Icons.Default.Speed)
     data object Detailed : Screen("detailed", "Detailed", Icons.Default.Dashboard)
-    data object Graphs : Screen("graphs", "Graphs", Icons.Default.Timeline)
     data object Processes : Screen("processes", "Processes", Icons.Default.Memory)
     data object Settings : Screen("settings", "Settings", Icons.Default.Settings)
 }
@@ -34,7 +32,6 @@ sealed class Screen(
 val bottomNavItems = listOf(
     Screen.Simple,
     Screen.Detailed,
-    Screen.Graphs,
     Screen.Processes,
     Screen.Settings
 )
@@ -76,7 +73,6 @@ fun SysLinkNavGraph() {
         ) {
             composable(Screen.Simple.route) { SimpleScreen() }
             composable(Screen.Detailed.route) { DetailedScreen() }
-            composable(Screen.Graphs.route) { GraphsScreen() }
             composable(Screen.Processes.route) { ProcessesScreen() }
             composable(Screen.Settings.route) { SettingsScreen() }
         }
