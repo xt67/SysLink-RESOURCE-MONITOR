@@ -171,22 +171,6 @@ fun MetricChartCard(
     dataPoints: List<Float>,
     unit: String
 ) {
-    val chartEntryModelProducer = remember { ChartEntryModelProducer() }
-    
-    LaunchedEffect(dataPoints) {
-        if (dataPoints.isNotEmpty()) {
-            try {
-                chartEntryModelProducer.setEntries(
-                    dataPoints.mapIndexed { index, value ->
-                        entryOf(index.toFloat(), value.coerceIn(0f, 1000f))
-                    }
-                )
-            } catch (e: Exception) {
-                // Handle chart data errors gracefully
-            }
-        }
-    }
-    
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -212,7 +196,17 @@ fun MetricChartCard(
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            if (dataPoints.isNotEmpty()) {
+            if (dataPoints.isNotEmpty() && dataPoints.size >= 2) {
+                val chartEntryModelProducer = remember(dataPoints) { 
+                    ChartEntryModelProducer(
+                        listOf(
+                            dataPoints.mapIndexed { index, value ->
+                                entryOf(index.toFloat(), value.coerceIn(0f, 1000f))
+                            }
+                        )
+                    )
+                }
+                
                 Chart(
                     chart = lineChart(
                         lines = listOf(
@@ -249,7 +243,7 @@ fun MetricChartCard(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "No data available",
+                            text = if (dataPoints.isEmpty()) "No data available" else "Loading...",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -278,30 +272,6 @@ fun NetworkChartCard(
     uploadData: List<Float>,
     downloadData: List<Float>
 ) {
-    val uploadProducer = remember { ChartEntryModelProducer() }
-    val downloadProducer = remember { ChartEntryModelProducer() }
-    
-    LaunchedEffect(uploadData, downloadData) {
-        try {
-            if (uploadData.isNotEmpty()) {
-                uploadProducer.setEntries(
-                    uploadData.mapIndexed { index, value -> 
-                        entryOf(index.toFloat(), value.coerceIn(0f, 10000f)) 
-                    }
-                )
-            }
-            if (downloadData.isNotEmpty()) {
-                downloadProducer.setEntries(
-                    downloadData.mapIndexed { index, value -> 
-                        entryOf(index.toFloat(), value.coerceIn(0f, 10000f)) 
-                    }
-                )
-            }
-        } catch (e: Exception) {
-            // Handle chart data errors gracefully
-        }
-    }
-    
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -320,7 +290,16 @@ fun NetworkChartCard(
             
             // Upload chart
             Text("Upload", style = MaterialTheme.typography.labelMedium, color = StatusGreen)
-            if (uploadData.isNotEmpty()) {
+            if (uploadData.isNotEmpty() && uploadData.size >= 2) {
+                val uploadProducer = remember(uploadData) {
+                    ChartEntryModelProducer(
+                        listOf(
+                            uploadData.mapIndexed { index, value -> 
+                                entryOf(index.toFloat(), value.coerceIn(0f, 10000f)) 
+                            }
+                        )
+                    )
+                }
                 Chart(
                     chart = lineChart(
                         lines = listOf(lineSpec(lineColor = StatusGreen))
@@ -339,7 +318,16 @@ fun NetworkChartCard(
             
             // Download chart
             Text("Download", style = MaterialTheme.typography.labelMedium, color = ChartNetwork)
-            if (downloadData.isNotEmpty()) {
+            if (downloadData.isNotEmpty() && downloadData.size >= 2) {
+                val downloadProducer = remember(downloadData) {
+                    ChartEntryModelProducer(
+                        listOf(
+                            downloadData.mapIndexed { index, value -> 
+                                entryOf(index.toFloat(), value.coerceIn(0f, 10000f)) 
+                            }
+                        )
+                    )
+                }
                 Chart(
                     chart = lineChart(
                         lines = listOf(lineSpec(lineColor = ChartNetwork))
