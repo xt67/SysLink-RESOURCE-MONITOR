@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>SysLink.Api</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SysLink.Core\SysLink.Core.csproj" />
+    <ProjectReference Include="..\SysLink.Hardware\SysLink.Hardware.csproj" />
+    <ProjectReference Include="..\SysLink.Data\SysLink.Data.csproj" />
+  </ItemGroup>
+
+</Project>

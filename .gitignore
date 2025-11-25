@@ -1,0 +1,68 @@
+# Windows Agent
+WindowsAgent/**/bin/
+WindowsAgent/**/obj/
+WindowsAgent/**/.vs/
+WindowsAgent/**/*.user
+WindowsAgent/**/*.suo
+WindowsAgent/**/publish/
+
+# Android App
+AndroidApp/.gradle/
+AndroidApp/build/
+AndroidApp/app/build/
+AndroidApp/app/.cxx/
+AndroidApp/local.properties
+AndroidApp/*.iml
+AndroidApp/**/*.iml
+AndroidApp/.idea/
+AndroidApp/captures/
+AndroidApp/.externalNativeBuild/
+AndroidApp/.cxx/
+
+# Keystore files (never commit)
+*.jks
+*.keystore
+release-keystore.jks
+
+# Environment files
+.env
+.env.*
+*.local
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.vscode/settings.json
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+
+# Test coverage
+coverage/
+*.coverage
+*.coveragexml
+
+# Build outputs
+dist/
+out/
+
+# Documentation generated
+docs/_build/

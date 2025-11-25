@@ -1,0 +1,217 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  JAVA_VERSION: '17'
+
+jobs:
+  # ===========================================
+  # Windows Agent Build & Test
+  # ===========================================
+  build-windows-agent:
+    name: Build Windows Agent
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Restore dependencies
+      run: dotnet restore
+      working-directory: WindowsAgent
+      
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+      working-directory: WindowsAgent
+      
+    - name: Run tests
+      run: dotnet test --configuration Release --no-build --verbosity normal
+      working-directory: WindowsAgent
+      continue-on-error: true
+      
+    - name: Publish Windows Agent
+      run: |
+        dotnet publish SysLink.Agent/SysLink.Agent.csproj `
+          --configuration Release `
+          --output ./publish/win-x64 `
+          --runtime win-x64 `
+          --self-contained true `
+          -p:PublishSingleFile=true `
+          -p:IncludeNativeLibrariesForSelfExtract=true
+      working-directory: WindowsAgent
+      
+    - name: Upload Windows Agent artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: SysLink-Agent-Windows-x64
+        path: WindowsAgent/publish/win-x64/
+        retention-days: 30
+
+  # ===========================================
+  # Android App Build
+  # ===========================================
+  build-android-app:
+    name: Build Android App
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        cache: gradle
+        
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+      working-directory: AndroidApp
+      
+    - name: Build Debug APK
+      run: ./gradlew assembleDebug --no-daemon
+      working-directory: AndroidApp
+      
+    - name: Build Release APK
+      run: ./gradlew assembleRelease --no-daemon
+      working-directory: AndroidApp
+      
+    - name: Run Android tests
+      run: ./gradlew test --no-daemon
+      working-directory: AndroidApp
+      continue-on-error: true
+      
+    - name: Upload Debug APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: SysLink-Android-Debug
+        path: AndroidApp/app/build/outputs/apk/debug/app-debug.apk
+        retention-days: 30
+        
+    - name: Upload Release APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: SysLink-Android-Release
+        path: AndroidApp/app/build/outputs/apk/release/app-release-unsigned.apk
+        retention-days: 30
+
+  # ===========================================
+  # Code Quality Checks
+  # ===========================================
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+        
+    - name: Check formatting (Windows Agent)
+      run: dotnet format --verify-no-changes
+      working-directory: WindowsAgent
+      continue-on-error: true
+      
+    - name: Setup JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        
+    - name: Lint Android
+      run: |
+        chmod +x gradlew
+        ./gradlew lint --no-daemon
+      working-directory: AndroidApp
+      continue-on-error: true
+
+  # ===========================================
+  # Create Release
+  # ===========================================
+  create-release:
+    name: Create Release
+    needs: [build-windows-agent, build-android-app]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download Windows Agent
+      uses: actions/download-artifact@v4
+      with:
+        name: SysLink-Agent-Windows-x64
+        path: ./release/windows
+        
+    - name: Download Android Debug APK
+      uses: actions/download-artifact@v4
+      with:
+        name: SysLink-Android-Debug
+        path: ./release/android
+        
+    - name: Download Android Release APK
+      uses: actions/download-artifact@v4
+      with:
+        name: SysLink-Android-Release
+        path: ./release/android
+        
+    - name: Create ZIP archives
+      run: |
+        cd release/windows
+        zip -r ../SysLink-Agent-Windows-x64.zip .
+        cd ../android
+        mv app-debug.apk SysLink-v${{ github.ref_name }}-debug.apk || true
+        mv app-release-unsigned.apk SysLink-v${{ github.ref_name }}-release.apk || true
+        
+    - name: Generate Release Notes
+      id: release_notes
+      run: |
+        echo "## SysLink ${{ github.ref_name }}" > RELEASE_NOTES.md
+        echo "" >> RELEASE_NOTES.md
+        echo "### Downloads" >> RELEASE_NOTES.md
+        echo "- **Windows Agent**: \`SysLink-Agent-Windows-x64.zip\`" >> RELEASE_NOTES.md
+        echo "- **Android App**: \`SysLink-${{ github.ref_name }}.apk\`" >> RELEASE_NOTES.md
+        echo "" >> RELEASE_NOTES.md
+        echo "### Installation" >> RELEASE_NOTES.md
+        echo "1. Download the Windows Agent and extract to a folder" >> RELEASE_NOTES.md
+        echo "2. Run \`SysLink.Agent.exe\` as Administrator" >> RELEASE_NOTES.md
+        echo "3. Install the Android APK on your device" >> RELEASE_NOTES.md
+        echo "4. Add your PC's IP address in the app Settings" >> RELEASE_NOTES.md
+        echo "" >> RELEASE_NOTES.md
+        echo "### Requirements" >> RELEASE_NOTES.md
+        echo "- Windows 10/11 (64-bit)" >> RELEASE_NOTES.md
+        echo "- Android 8.0+ (API 26+)" >> RELEASE_NOTES.md
+        
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        body_path: RELEASE_NOTES.md
+        files: |
+          release/SysLink-Agent-Windows-x64.zip
+          release/android/*.apk
+        draft: false
+        prerelease: ${{ contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
