@@ -197,7 +197,7 @@ fun CircularMetricCard(
                 modifier = Modifier.size(100.dp)
             ) {
                 CircularProgressIndicator(
-                    progress = { animatedValue / 100f },
+                    progress = { (animatedValue / 100f).coerceIn(0f, 1f) },
                     modifier = Modifier.fillMaxSize(),
                     color = color,
                     strokeWidth = 8.dp,

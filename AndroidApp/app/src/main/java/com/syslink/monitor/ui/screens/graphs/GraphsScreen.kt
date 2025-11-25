@@ -10,7 +10,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -19,12 +18,13 @@ import com.patrykandpatrick.vico.compose.axis.vertical.rememberStartAxis
 import com.patrykandpatrick.vico.compose.chart.Chart
 import com.patrykandpatrick.vico.compose.chart.line.lineChart
 import com.patrykandpatrick.vico.compose.chart.line.lineSpec
-import com.patrykandpatrick.vico.compose.style.ProvideChartStyle
+import com.patrykandpatrick.vico.compose.component.shape.shader.fromBrush
+import com.patrykandpatrick.vico.core.component.shape.shader.DynamicShaders
 import com.patrykandpatrick.vico.core.entry.ChartEntryModelProducer
 import com.patrykandpatrick.vico.core.entry.entryOf
+import androidx.compose.ui.graphics.Brush
 import com.syslink.monitor.ui.theme.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GraphsScreen(
     viewModel: GraphsViewModel = hiltViewModel()
@@ -216,7 +216,14 @@ fun MetricChartCard(
                 Chart(
                     chart = lineChart(
                         lines = listOf(
-                            lineSpec(lineColor = color)
+                            lineSpec(
+                                lineColor = color,
+                                lineBackgroundShader = DynamicShaders.fromBrush(
+                                    Brush.verticalGradient(
+                                        listOf(color.copy(alpha = 0.4f), color.copy(alpha = 0f))
+                                    )
+                                )
+                            )
                         )
                     ),
                     chartModelProducer = chartEntryModelProducer,

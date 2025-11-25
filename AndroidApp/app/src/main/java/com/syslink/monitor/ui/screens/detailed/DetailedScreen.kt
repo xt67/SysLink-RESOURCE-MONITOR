@@ -138,7 +138,7 @@ fun CpuDetailCard(cpu: CpuMetrics) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("Core ${core.coreId}", style = MaterialTheme.typography.bodySmall)
                                 LinearProgressIndicator(
-                                    progress = { (core.usage / 100).toFloat() },
+                                    progress = { (core.usage / 100).toFloat().coerceIn(0f, 1f) },
                                     modifier = Modifier.fillMaxWidth(),
                                     color = ChartCpu
                                 )
