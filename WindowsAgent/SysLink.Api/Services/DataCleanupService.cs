@@ -25,6 +25,19 @@ public class DataCleanupService : BackgroundService
     {
         _logger.LogInformation("Data cleanup service starting");
 
+        // Wait a bit then initialize database (MetricsCollectionService might also do this)
+        await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+        
+        try
+        {
+            await _metricsStorage.InitializeAsync();
+            _logger.LogInformation("Data cleanup service: database ready");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Database already initialized or init failed, continuing...");
+        }
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try

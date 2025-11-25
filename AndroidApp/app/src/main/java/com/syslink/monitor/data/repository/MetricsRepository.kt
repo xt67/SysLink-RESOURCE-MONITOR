@@ -1,10 +1,13 @@
 package com.syslink.monitor.data.repository
 
+import android.content.Context
 import android.util.Log
+import com.syslink.monitor.data.api.ApiProvider
 import com.syslink.monitor.data.api.SysLinkApi
 import com.syslink.monitor.data.model.*
 import com.syslink.monitor.util.AppError
 import com.syslink.monitor.util.retryWithBackoff
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -18,10 +21,56 @@ import javax.inject.Singleton
  */
 @Singleton
 class MetricsRepository @Inject constructor(
-    private val api: SysLinkApi
+    private val apiProvider: ApiProvider,
+    @ApplicationContext private val context: Context
 ) {
     companion object {
         private const val TAG = "MetricsRepository"
+        private const val PREFS_NAME = "syslink_prefs"
+        private const val KEY_SERVER_IP = "server_ip"
+        private const val KEY_SERVER_PORT = "server_port"
+    }
+    
+    private val prefs by lazy { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
+    
+    /**
+     * Gets the current API based on saved server settings.
+     */
+    private fun getApi(): SysLinkApi? {
+        val ip = prefs.getString(KEY_SERVER_IP, null) ?: return null
+        val port = prefs.getInt(KEY_SERVER_PORT, 5443)
+        return apiProvider.getApi(ip, port)
+    }
+    
+    /**
+     * Sets the server to connect to.
+     */
+    fun setServer(ipAddress: String, port: Int) {
+        prefs.edit()
+            .putString(KEY_SERVER_IP, ipAddress)
+            .putInt(KEY_SERVER_PORT, port)
+            .apply()
+        Log.i(TAG, "Server set to $ipAddress:$port")
+    }
+    
+    /**
+     * Gets current server info.
+     */
+    fun getServerInfo(): Pair<String?, Int> {
+        val ip = prefs.getString(KEY_SERVER_IP, null)
+        val port = prefs.getInt(KEY_SERVER_PORT, 5443)
+        return Pair(ip, port)
+    }
+    
+    /**
+     * Clears the server configuration.
+     */
+    fun clearServer() {
+        prefs.edit()
+            .remove(KEY_SERVER_IP)
+            .remove(KEY_SERVER_PORT)
+            .apply()
+        apiProvider.clearApi()
     }
     
     /**
@@ -29,10 +78,16 @@ class MetricsRepository @Inject constructor(
      */
     private suspend fun <T> safeApiCall(
         operation: String,
-        call: suspend () -> Response<T>
+        call: suspend (SysLinkApi) -> Response<T>
     ): Result<T> {
+        val api = getApi()
+        if (api == null) {
+            Log.w(TAG, "$operation: No server configured")
+            return Result.failure(Exception("No server configured. Please add a server in Settings."))
+        }
+        
         return try {
-            val response = call()
+            val response = call(api)
             when {
                 response.isSuccessful && response.body() != null -> {
                     Result.success(response.body()!!)
@@ -68,21 +123,21 @@ class MetricsRepository @Inject constructor(
      * Gets complete system metrics.
      */
     suspend fun getMetrics(): Result<SystemMetrics> {
-        return safeApiCall("GetMetrics") { api.getStatus() }
+        return safeApiCall("GetMetrics") { it.getStatus() }
     }
     
     /**
      * Gets minimal metrics for simple view.
      */
     suspend fun getMinimalMetrics(): Result<MinimalMetrics> {
-        return safeApiCall("GetMinimalMetrics") { api.getMinimal() }
+        return safeApiCall("GetMinimalMetrics") { it.getMinimal() }
     }
     
     /**
      * Gets system information.
      */
     suspend fun getSystemInfo(): Result<SystemInfo> {
-        return safeApiCall("GetSystemInfo") { api.getSystemInfo() }
+        return safeApiCall("GetSystemInfo") { it.getSystemInfo() }
     }
     
     /**
@@ -94,7 +149,7 @@ class MetricsRepository @Inject constructor(
         top: Int = 50,
         search: String? = null
     ): Result<ProcessListResponse> {
-        return safeApiCall("GetProcesses") { 
+        return safeApiCall("GetProcesses") { api -> 
             api.getProcesses(sortBy, sortDesc, top, search) 
         }
     }
@@ -106,6 +161,11 @@ class MetricsRepository @Inject constructor(
         metric: String,
         period: String = "1h"
     ): Result<HistoryResponse> {
+        val api = getApi()
+        if (api == null) {
+            return Result.failure(Exception("No server configured"))
+        }
+        
         return try {
             val response = retryWithBackoff(times = 2) {
                 api.getHistory(metric, period)
@@ -127,13 +187,14 @@ class MetricsRepository @Inject constructor(
      * Pairs with a new server.
      */
     suspend fun pairWithServer(request: PairRequest): Result<PairResponse> {
-        return safeApiCall("PairWithServer") { api.pair(request) }
+        return safeApiCall("PairWithServer") { it.pair(request) }
     }
     
     /**
      * Checks if connection to server is healthy.
      */
     suspend fun checkHealth(): Boolean {
+        val api = getApi() ?: return false
         return try {
             val response = api.healthCheck()
             response.isSuccessful
@@ -169,6 +230,20 @@ class MetricsRepository @Inject constructor(
             }
             
             kotlinx.coroutines.delay(intervalMs)
+        }
+    }
+    
+    /**
+     * Tests connection to a specific server.
+     */
+    suspend fun testConnection(ipAddress: String, port: Int): Boolean {
+        return try {
+            val api = apiProvider.getApi(ipAddress, port)
+            val response = api.healthCheck()
+            response.isSuccessful
+        } catch (e: Exception) {
+            Log.e(TAG, "Connection test failed: ${e.message}")
+            false
         }
     }
 }

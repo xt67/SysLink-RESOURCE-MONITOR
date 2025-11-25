@@ -255,7 +255,7 @@ public class SqliteMetricsStorage : IMetricsStorage
         await _semaphore.WaitAsync();
         try
         {
-            EnsureConnection();
+            await EnsureConnectionAsync();
 
             var cutoffTime = DateTime.UtcNow - retention;
             var sql = "DELETE FROM metrics WHERE timestamp < @cutoffTime";
@@ -320,6 +320,18 @@ public class SqliteMetricsStorage : IMetricsStorage
         }
 
         return aggregated;
+    }
+
+    private async Task EnsureConnectionAsync()
+    {
+        if (_connection == null)
+        {
+            await InitializeAsync();
+        }
+        else if (_connection.State != System.Data.ConnectionState.Open)
+        {
+            await _connection.OpenAsync();
+        }
     }
 
     private void EnsureConnection()
