@@ -397,55 +397,79 @@ public class HardwareMonitorService : IHardwareMonitor
 
     private BatteryMetrics? GetBatteryMetrics()
     {
-        foreach (var hardware in _computer.Hardware)
-        {
-            if (hardware.HardwareType == HardwareType.Battery)
-            {
-                var battery = new BatteryMetrics { IsPresent = true };
+        // First check if battery hardware exists
+        var batteryHardware = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Battery);
+        if (batteryHardware == null)
+            return null;
 
-                foreach (var sensor in hardware.Sensors)
+        var battery = new BatteryMetrics { IsPresent = true };
+
+        // Get charge percent from Windows WMI (more reliable)
+        try
+        {
+            using var searcher = new System.Management.ManagementObjectSearcher("SELECT * FROM Win32_Battery");
+            foreach (System.Management.ManagementObject obj in searcher.Get())
+            {
+                var estimatedCharge = obj["EstimatedChargeRemaining"];
+                if (estimatedCharge != null)
                 {
-                    switch (sensor.SensorType)
-                    {
-                        case SensorType.Level:
-                            battery.ChargePercent = sensor.Value ?? 0;
-                            break;
-                        case SensorType.Energy when sensor.Name.Contains("Designed"):
-                            battery.DesignCapacityWh = sensor.Value ?? 0;
-                            break;
-                        case SensorType.Energy when sensor.Name.Contains("Full"):
-                            battery.FullChargeCapacityWh = sensor.Value ?? 0;
-                            break;
-                        case SensorType.Power when sensor.Name.Contains("Charge"):
-                            battery.ChargeRateW = sensor.Value ?? 0;
-                            break;
-                        case SensorType.Power when sensor.Name.Contains("Discharge"):
-                            battery.DischargeRateW = sensor.Value ?? 0;
-                            break;
-                        case SensorType.Voltage:
-                            battery.Voltage = sensor.Value ?? 0;
-                            break;
-                        case SensorType.TimeSpan when sensor.Name.Contains("Remaining"):
-                            battery.EstimatedTimeRemaining = TimeSpan.FromSeconds(sensor.Value ?? 0);
-                            break;
-                    }
+                    battery.ChargePercent = Convert.ToDouble(estimatedCharge);
                 }
 
-                // Determine charging status
-                if (battery.ChargeRateW > 0)
-                    battery.Status = BatteryStatus.Charging;
-                else if (battery.DischargeRateW > 0)
-                    battery.Status = BatteryStatus.Discharging;
-                else if (battery.ChargePercent >= 99)
-                    battery.Status = BatteryStatus.Full;
-                else
-                    battery.Status = BatteryStatus.NotCharging;
+                var batteryStatus = obj["BatteryStatus"];
+                if (batteryStatus != null)
+                {
+                    var statusCode = Convert.ToInt32(batteryStatus);
+                    // 1=Discharging, 2=AC, 3=FullyCharged, 4=Low, 5=Critical, 6=Charging, 7=ChargingHigh, 8=ChargingLow
+                    battery.Status = statusCode switch
+                    {
+                        1 or 4 or 5 => BatteryStatus.Discharging,
+                        2 => BatteryStatus.NotCharging,
+                        3 => BatteryStatus.Full,
+                        6 or 7 or 8 => BatteryStatus.Charging,
+                        _ => BatteryStatus.NotCharging
+                    };
+                }
+                break;
+            }
+        }
+        catch
+        {
+            // Fallback: try to get from LibreHardwareMonitor sensors
+        }
 
-                return battery;
+        // Get additional info from LibreHardwareMonitor
+        foreach (var sensor in batteryHardware.Sensors)
+        {
+            switch (sensor.SensorType)
+            {
+                case SensorType.Level when sensor.Name.Contains("Charge"):
+                    // Only use if WMI didn't work
+                    if (battery.ChargePercent == 0)
+                        battery.ChargePercent = sensor.Value ?? 0;
+                    break;
+                case SensorType.Energy when sensor.Name.Contains("Designed"):
+                    battery.DesignCapacityWh = sensor.Value ?? 0;
+                    break;
+                case SensorType.Energy when sensor.Name.Contains("Full"):
+                    battery.FullChargeCapacityWh = sensor.Value ?? 0;
+                    break;
+                case SensorType.Power when sensor.Name.Contains("Charge"):
+                    battery.ChargeRateW = sensor.Value ?? 0;
+                    break;
+                case SensorType.Power when sensor.Name.Contains("Discharge"):
+                    battery.DischargeRateW = sensor.Value ?? 0;
+                    break;
+                case SensorType.Voltage:
+                    battery.Voltage = sensor.Value ?? 0;
+                    break;
+                case SensorType.TimeSpan when sensor.Name.Contains("Remaining"):
+                    battery.EstimatedTimeRemaining = TimeSpan.FromSeconds(sensor.Value ?? 0);
+                    break;
             }
         }
 
-        return null;
+        return battery;
     }
 
     private List<FanMetrics> GetFanMetrics()

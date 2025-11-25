@@ -21,9 +21,9 @@
     "MaxProcessesToTrack": 100
   },
   "Security": {
-    "RequireAuthentication": true,
+    "RequireAuthentication": false,
     "AuthToken": "5pDQz1mlanpk9hg8AyJ7yxZaWooOyncVPBKm9qqSqNo=",
-    "AllowRemoteAccess": false,
+    "AllowRemoteAccess": true,
     "AllowedIpAddresses": [],
     "EnableMutualTls": false,
     "TokenExpirationMinutes": 1440
