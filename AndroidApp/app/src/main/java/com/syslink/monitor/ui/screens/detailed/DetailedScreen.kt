@@ -297,6 +297,7 @@ fun NetworkDetailCard(network: NetworkMetrics) {
 
 @Composable
 fun BatteryDetailCard(battery: BatteryMetrics) {
+    val isCharging = battery.status == "Charging" || battery.status == "Full"
     val statusColor = when (battery.status) {
         "Charging" -> StatusGreen
         "Discharging" -> if (battery.chargePercent < 20) StatusRed else StatusYellow
@@ -304,34 +305,138 @@ fun BatteryDetailCard(battery: BatteryMetrics) {
         else -> MaterialTheme.colorScheme.onSurface
     }
     
+    val statusIcon = when (battery.status) {
+        "Charging" -> Icons.Default.BatteryChargingFull
+        "Full" -> Icons.Default.BatteryFull
+        else -> when {
+            battery.chargePercent >= 90 -> Icons.Default.BatteryFull
+            battery.chargePercent >= 50 -> Icons.Default.Battery5Bar
+            battery.chargePercent >= 20 -> Icons.Default.Battery3Bar
+            else -> Icons.Default.Battery1Bar
+        }
+    }
+    
+    val batteryHealth = 100 - battery.wearLevel
+    
     ExpandableDetailCard(
         title = "Battery",
-        icon = Icons.Default.BatteryFull,
+        icon = statusIcon,
         color = ChartBattery,
-        summary = "%.0f%% - ${battery.status}".format(battery.chargePercent)
+        summary = "%.0f%% - ${if (isCharging) "Plugged In" else "On Battery"}".format(battery.chargePercent)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            MetricBar("Charge", battery.chargePercent, 100.0, statusColor)
-            
-            InfoRow("Status", battery.status)
-            
-            if (battery.estimatedTimeRemaining != null) {
-                InfoRow("Time Remaining", battery.estimatedTimeRemaining)
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Current Status Section
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = statusColor.copy(alpha = 0.1f)
+                )
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        "Current Status",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (isCharging) Icons.Default.Power else Icons.Default.PowerOff,
+                                contentDescription = null,
+                                tint = statusColor,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isCharging) "Plugged In" else "On Battery",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = statusColor
+                            )
+                        }
+                        Text(
+                            text = "%.0f%%".format(battery.chargePercent),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = statusColor
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    MetricBar("Charge Level", battery.chargePercent, 100.0, statusColor)
+                    
+                    if (battery.estimatedTimeRemaining != null && !isCharging) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        InfoRow("Time Remaining", battery.estimatedTimeRemaining)
+                    }
+                    
+                    if (battery.chargeRateW > 0 && isCharging) {
+                        InfoRow("Charging at", "%.1f W".format(battery.chargeRateW))
+                    }
+                    if (battery.dischargeRateW > 0 && !isCharging) {
+                        InfoRow("Power Draw", "%.1f W".format(battery.dischargeRateW))
+                    }
+                }
             }
             
-            InfoRow("Health", "%.1f%% wear".format(battery.wearLevel))
-            InfoRow("Design Capacity", "%.1f Wh".format(battery.designCapacityWh))
-            InfoRow("Full Charge Capacity", "%.1f Wh".format(battery.fullChargeCapacityWh))
-            
-            if (battery.cycleCount > 0) {
-                InfoRow("Cycle Count", "${battery.cycleCount}")
-            }
-            
-            if (battery.chargeRateW > 0) {
-                InfoRow("Charge Rate", "%.1f W".format(battery.chargeRateW))
-            }
-            if (battery.dischargeRateW > 0) {
-                InfoRow("Discharge Rate", "%.1f W".format(battery.dischargeRateW))
+            // Battery Health Section
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                )
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        "Battery Health",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    val healthColor = when {
+                        batteryHealth >= 80 -> StatusGreen
+                        batteryHealth >= 50 -> StatusYellow
+                        else -> StatusRed
+                    }
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Overall Health",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "%.0f%%".format(batteryHealth),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = healthColor
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    MetricBar("Health", batteryHealth, 100.0, healthColor)
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    InfoRow("Degradation", "%.1f%%".format(battery.wearLevel))
+                    InfoRow("Design Capacity", "%.1f Wh".format(battery.designCapacityWh / 1000))
+                    InfoRow("Current Capacity", "%.1f Wh".format(battery.fullChargeCapacityWh / 1000))
+                    
+                    if (battery.cycleCount > 0) {
+                        InfoRow("Charge Cycles", "${battery.cycleCount}")
+                    }
+                    
+                    if (battery.voltage > 0) {
+                        InfoRow("Voltage", "%.2f V".format(battery.voltage))
+                    }
+                }
             }
         }
     }

@@ -19,6 +19,8 @@ data class SimpleUiState(
     val gpuUsage: Double = 0.0,
     val ramUsage: Double = 0.0,
     val batteryPercent: Double? = null,
+    val batteryStatus: String = "Unknown",
+    val batteryWearLevel: Double = 0.0,
     val maxCpuTemp: Double = 0.0,
     val gpuTemp: Double = 0.0,
     val networkUpload: Double = 0.0,
@@ -75,14 +77,16 @@ class SimpleViewModel @Inject constructor(
             }
         )
         
-        // Also fetch network data from full metrics
+        // Also fetch network and battery data from full metrics
         val fullResult = repository.getMetrics()
         fullResult.onSuccess { metrics ->
             _uiState.update { current ->
                 current.copy(
                     networkUpload = metrics.network.uploadSpeedMbps,
                     networkDownload = metrics.network.downloadSpeedMbps,
-                    serverName = metrics.cpu.name.take(20)
+                    serverName = metrics.cpu.name.take(20),
+                    batteryStatus = metrics.battery?.status ?: "Unknown",
+                    batteryWearLevel = metrics.battery?.wearLevel ?: 0.0
                 )
             }
         }

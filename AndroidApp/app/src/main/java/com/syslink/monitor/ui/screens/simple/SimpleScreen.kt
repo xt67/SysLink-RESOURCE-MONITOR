@@ -77,13 +77,11 @@ fun SimpleScreen(
                 icon = Icons.Default.Storage
             )
             if (uiState.batteryPercent != null) {
-                CircularMetricCard(
+                BatteryMetricCard(
                     modifier = Modifier.weight(1f),
-                    title = "Battery",
-                    value = uiState.batteryPercent ?: 0.0,
-                    unit = "%",
-                    color = ChartBattery,
-                    icon = Icons.Default.BatteryFull
+                    batteryPercent = uiState.batteryPercent ?: 0.0,
+                    status = uiState.batteryStatus,
+                    wearLevel = uiState.batteryWearLevel
                 )
             } else {
                 Spacer(modifier = Modifier.weight(1f))
@@ -353,5 +351,117 @@ fun NetworkStatItem(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold
         )
+    }
+}
+
+@Composable
+fun BatteryMetricCard(
+    modifier: Modifier = Modifier,
+    batteryPercent: Double,
+    status: String,
+    wearLevel: Double
+) {
+    val isCharging = status == "Charging" || status == "Full"
+    val statusColor = when (status) {
+        "Charging" -> StatusGreen
+        "Full" -> StatusGreen
+        "Discharging" -> if (batteryPercent < 20) StatusRed else StatusYellow
+        else -> ChartBattery
+    }
+    
+    val batteryIcon = when {
+        status == "Charging" -> Icons.Default.BatteryChargingFull
+        batteryPercent >= 90 -> Icons.Default.BatteryFull
+        batteryPercent >= 50 -> Icons.Default.Battery5Bar
+        batteryPercent >= 20 -> Icons.Default.Battery3Bar
+        else -> Icons.Default.Battery1Bar
+    }
+    
+    val animatedValue by animateFloatAsState(
+        targetValue = batteryPercent.toFloat(),
+        animationSpec = tween(500),
+        label = "battery"
+    )
+    
+    Card(modifier = modifier) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    imageVector = batteryIcon,
+                    contentDescription = null,
+                    tint = statusColor,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "Battery",
+                    style = MaterialTheme.typography.labelMedium
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(100.dp)
+            ) {
+                CircularProgressIndicator(
+                    progress = { (animatedValue / 100f).coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxSize(),
+                    color = statusColor,
+                    strokeWidth = 8.dp,
+                    trackColor = statusColor.copy(alpha = 0.2f),
+                    strokeCap = StrokeCap.Round
+                )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "%.0f".format(animatedValue),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Status indicator
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    imageVector = if (isCharging) Icons.Default.Power else Icons.Default.BatteryStd,
+                    contentDescription = null,
+                    tint = statusColor,
+                    modifier = Modifier.size(12.dp)
+                )
+                Text(
+                    text = if (isCharging) "Plugged In" else "On Battery",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = statusColor
+                )
+            }
+            
+            // Health indicator
+            if (wearLevel > 0) {
+                Text(
+                    text = "Health: %.0f%%".format(100 - wearLevel),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
