@@ -142,6 +142,7 @@ public class BatteryMetrics
     public double Voltage { get; set; }
 }
 
+[System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
 public enum BatteryStatus
 {
     Unknown,
