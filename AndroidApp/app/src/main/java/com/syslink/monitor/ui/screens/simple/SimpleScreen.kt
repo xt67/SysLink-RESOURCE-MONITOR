@@ -361,10 +361,12 @@ fun BatteryMetricCard(
     status: String,
     wearLevel: Double
 ) {
-    val isCharging = status == "Charging" || status == "Full"
+    // NotCharging means plugged in but battery full/conservation mode
+    val isPluggedIn = status == "Charging" || status == "Full" || status == "NotCharging"
     val statusColor = when (status) {
         "Charging" -> StatusGreen
         "Full" -> StatusGreen
+        "NotCharging" -> StatusGreen  // Plugged in but not actively charging
         "Discharging" -> if (batteryPercent < 20) StatusRed else StatusYellow
         else -> ChartBattery
     }
@@ -442,13 +444,13 @@ fun BatteryMetricCard(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Icon(
-                    imageVector = if (isCharging) Icons.Default.Power else Icons.Default.BatteryStd,
+                    imageVector = if (isPluggedIn) Icons.Default.Power else Icons.Default.BatteryStd,
                     contentDescription = null,
                     tint = statusColor,
                     modifier = Modifier.size(12.dp)
                 )
                 Text(
-                    text = if (isCharging) "Plugged In" else "On Battery",
+                    text = if (isPluggedIn) "Plugged In" else "On Battery",
                     style = MaterialTheme.typography.labelSmall,
                     color = statusColor
                 )

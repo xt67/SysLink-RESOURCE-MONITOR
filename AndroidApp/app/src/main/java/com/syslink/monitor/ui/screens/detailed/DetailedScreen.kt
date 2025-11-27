@@ -297,11 +297,13 @@ fun NetworkDetailCard(network: NetworkMetrics) {
 
 @Composable
 fun BatteryDetailCard(battery: BatteryMetrics) {
-    val isCharging = battery.status == "Charging" || battery.status == "Full"
+    // NotCharging means plugged in but battery full/conservation mode
+    val isCharging = battery.status == "Charging" || battery.status == "Full" || battery.status == "NotCharging"
     val statusColor = when (battery.status) {
         "Charging" -> StatusGreen
         "Discharging" -> if (battery.chargePercent < 20) StatusRed else StatusYellow
         "Full" -> StatusGreen
+        "NotCharging" -> StatusGreen  // Plugged in but not actively charging
         else -> MaterialTheme.colorScheme.onSurface
     }
     

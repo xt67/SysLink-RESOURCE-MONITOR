@@ -395,6 +395,21 @@ public class HardwareMonitorService : IHardwareMonitor
         return networkMetrics;
     }
 
+    // Native Windows API for power status
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern bool GetSystemPowerStatus(out SYSTEM_POWER_STATUS lpSystemPowerStatus);
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct SYSTEM_POWER_STATUS
+    {
+        public byte ACLineStatus;          // 0=Offline, 1=Online, 255=Unknown
+        public byte BatteryFlag;           // 1=High, 2=Low, 4=Critical, 8=Charging, 128=No battery
+        public byte BatteryLifePercent;    // 0-100 or 255 if unknown
+        public byte SystemStatusFlag;
+        public int BatteryLifeTime;        // seconds remaining, -1 if unknown
+        public int BatteryFullLifeTime;
+    }
+
     private BatteryMetrics? GetBatteryMetrics()
     {
         // First check if battery hardware exists
@@ -404,38 +419,59 @@ public class HardwareMonitorService : IHardwareMonitor
 
         var battery = new BatteryMetrics { IsPresent = true };
 
-        // Get charge percent from Windows WMI (more reliable)
+        // Use native Windows API for accurate battery status (most reliable)
         try
         {
-            using var searcher = new System.Management.ManagementObjectSearcher("SELECT * FROM Win32_Battery");
-            foreach (System.Management.ManagementObject obj in searcher.Get())
+            if (GetSystemPowerStatus(out var powerStatus))
             {
-                var estimatedCharge = obj["EstimatedChargeRemaining"];
-                if (estimatedCharge != null)
+                // Get charge percentage
+                if (powerStatus.BatteryLifePercent != 255)
                 {
-                    battery.ChargePercent = Convert.ToDouble(estimatedCharge);
+                    battery.ChargePercent = powerStatus.BatteryLifePercent;
                 }
 
-                var batteryStatus = obj["BatteryStatus"];
-                if (batteryStatus != null)
+                // Determine charging status based on ACLineStatus and BatteryFlag
+                bool isPluggedIn = powerStatus.ACLineStatus == 1;
+                bool isCharging = (powerStatus.BatteryFlag & 8) != 0;
+                
+                if (isPluggedIn)
                 {
-                    var statusCode = Convert.ToInt32(batteryStatus);
-                    // 1=Discharging, 2=AC, 3=FullyCharged, 4=Low, 5=Critical, 6=Charging, 7=ChargingHigh, 8=ChargingLow
-                    battery.Status = statusCode switch
-                    {
-                        1 or 4 or 5 => BatteryStatus.Discharging,
-                        2 => BatteryStatus.NotCharging,
-                        3 => BatteryStatus.Full,
-                        6 or 7 or 8 => BatteryStatus.Charging,
-                        _ => BatteryStatus.NotCharging
-                    };
+                    if (isCharging)
+                        battery.Status = BatteryStatus.Charging;
+                    else if (powerStatus.BatteryLifePercent >= 95)
+                        battery.Status = BatteryStatus.Full;
+                    else
+                        battery.Status = BatteryStatus.NotCharging; // Plugged in but not charging (conservation mode, etc.)
                 }
-                break;
+                else
+                {
+                    battery.Status = BatteryStatus.Discharging;
+                }
+
+                // Get estimated time remaining
+                if (powerStatus.BatteryLifeTime > 0 && powerStatus.BatteryLifeTime != -1)
+                {
+                    battery.EstimatedTimeRemaining = TimeSpan.FromSeconds(powerStatus.BatteryLifeTime);
+                }
             }
         }
         catch
         {
-            // Fallback: try to get from LibreHardwareMonitor sensors
+            // Fallback: try WMI
+            try
+            {
+                using var searcher = new System.Management.ManagementObjectSearcher("SELECT * FROM Win32_Battery");
+                foreach (System.Management.ManagementObject obj in searcher.Get())
+                {
+                    var estimatedCharge = obj["EstimatedChargeRemaining"];
+                    if (estimatedCharge != null)
+                    {
+                        battery.ChargePercent = Convert.ToDouble(estimatedCharge);
+                    }
+                    break;
+                }
+            }
+            catch { }
         }
 
         // Get additional info from LibreHardwareMonitor
